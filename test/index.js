@@ -1,6 +1,7 @@
 import { render } from "../dist/index.js"
 import { Client } from "discord.js"
 import fs from "fs"
+import 'dotenv/config'
 
 const client = new Client({intents: 38403})
 
@@ -19,4 +20,4 @@ client.on("messageCreate", async msg => {
 	}
 })
 
-client.login("")
+client.login(process.env.TOKEN)

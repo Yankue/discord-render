@@ -68,8 +68,7 @@ export async function render(msg: ManualInputMessage|Message) {
 			    font-family: "gg sans", "Noto Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
 			    background-color: #313338;
 			    color: #dbdee1;
-			    padding: 16px;
-			    border-radius: 8px;
+			    padding: 4px;
 			    max-width: 600px;
 			  }
 
