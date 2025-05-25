@@ -1,0 +1,9 @@
+node_modules
+dist
+package-lock.json
+.env
+
+test/package-lock.json
+test/node_modules
+test/output.png
+test/.env
