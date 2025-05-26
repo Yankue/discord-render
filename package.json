@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Render discord messages to an image!",
   "main": "dist/index.js",
+  "repository": "https://github.com/Yankue/discord-render",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc"
