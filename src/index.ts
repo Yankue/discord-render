@@ -1,4 +1,4 @@
-import nodeHtmlToImage from "node-html-to-image";
+import nodeHtmlToImage from 'node-html-to-image';
 import { Message, Attachment, User } from "discord.js";
 
 export interface RenderOptions {

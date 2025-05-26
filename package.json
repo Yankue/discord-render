@@ -1,18 +1,32 @@
 {
   "name": "discord-render",
-  "type": "module",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Render discord messages to an image!",
-  "main": "dist/index.js",
   "repository": "https://github.com/Yankue/discord-render",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc"
+    "build": "tsup src/index.ts --format esm,cjs --dts"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "author": "Yankue",
   "license": "MIT",
   "devDependencies": {
     "discord.js": "^14.19.3",
+    "tsup": "^8.5.0",
     "typescript": "^5.8.3"
   },
   "dependencies": {
