@@ -67,8 +67,41 @@ test('render groups consecutive messages from the same user into a compact follo
     { format: 'html' }
   );
 
-  assert.match(html, /compact-message/);
-  assert.doesNotMatch(html, /<img src="https:\/\/cdn\.discordapp\.com\/embed\/avatars\/0\.png" alt="User2's avatar" class="avatar" \/>/);
+  const compactBlock = html.match(/<div class="discord-message" id="message-1">[\s\S]*?<div class="message-container[^>]*compact-message">([\s\S]*?)<\/div>\s*<\/div>/);
+
+  assert.ok(compactBlock, 'expected a compact follow-up message block');
+  assert.doesNotMatch(compactBlock[1], /class="avatar"/);
+  assert.doesNotMatch(compactBlock[1], /<div class="header">/);
+});
+
+test('render outputs rich embed markup for bot-style messages', async () => {
+  const html = await render(
+    [
+      {
+        ...createMessage('Check out this embed', 'embed-1'),
+        embeds: [
+          {
+            title: 'Rich embed title',
+            description: 'Rich embed description',
+            color: 0x5865f2,
+            fields: [{ name: 'Field', value: 'Value', inline: true }],
+            footer: { text: 'Footer text' },
+            author: { name: 'Bot', iconURL: 'https://example.com/bot.png' },
+            thumbnail: { url: 'https://example.com/thumb.png' },
+            image: { url: 'https://example.com/image.png' },
+            url: 'https://example.com/embed',
+          },
+        ],
+      },
+    ],
+    { format: 'html' }
+  );
+
+  assert.match(html, /embed-container/);
+  assert.match(html, /Rich embed title/);
+  assert.match(html, /Rich embed description/);
+  assert.match(html, /Footer text/);
+  assert.match(html, /Field/);
 });
 
 test('render adds a timestamp link when doLink is enabled and a timestamp exists', async () => {

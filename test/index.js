@@ -3,7 +3,7 @@ import { Client } from "discord.js"
 import fs from "fs"
 import 'dotenv/config'
 
-const client = new Client({intents: 38403})
+/*const client = new Client({intents: 38403})
 
 
 client.on("ready", () => {
@@ -20,4 +20,15 @@ client.on("messageCreate", async msg => {
 	}
 })
 
-client.login(process.env.TOKEN)
+client.login(process.env.TOKEN)*/
+
+const msg = {
+	content: "Hi guys",
+	embeds: [
+		{description: "Hello!\n# This is header", title: "Good morning!", color: "#15daff", footer: {text: "foot"}}
+	]
+}
+
+render(msg, {format: "image"}).then(buffer => {
+	fs.writeFile("./output.png", buffer, () => {})
+})

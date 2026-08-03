@@ -34,6 +34,39 @@ export interface RenderableSticker {
   name?: string;
 }
 
+export interface RenderableEmbedAuthor {
+  name?: string;
+  iconURL?: string;
+  url?: string;
+}
+
+export interface RenderableEmbedField {
+  name?: string;
+  value?: string;
+  inline?: boolean;
+}
+
+export interface RenderableEmbedFooter {
+  text?: string;
+  iconURL?: string;
+}
+
+export interface RenderableEmbedMedia {
+  url?: string;
+}
+
+export interface RenderableEmbed {
+  title?: string;
+  description?: string;
+  url?: string;
+  color?: number | string;
+  fields?: Array<RenderableEmbedField> | { values?: () => RenderableEmbedField[] } | null;
+  footer?: RenderableEmbedFooter | null;
+  author?: RenderableEmbedAuthor | null;
+  thumbnail?: RenderableEmbedMedia | null;
+  image?: RenderableEmbedMedia | null;
+}
+
 export interface RenderableGuild {
   id?: string | number;
   members?: {
@@ -712,6 +745,87 @@ function generateStickersHTML(stickers: RenderableSticker[]): string {
   return html;
 }
 
+function normalizeEmbedColor(color?: number | string): string {
+  if (typeof color === "number") {
+    return `#${color.toString(16).padStart(6, "0")}`;
+  }
+
+  if (typeof color === "string") {
+    const normalized = color.trim();
+    if (/^#?[0-9a-fA-F]{6}$/.test(normalized)) {
+      return `#${normalized.replace("#", "")}`;
+    }
+    if (/^#?[0-9a-fA-F]{3}$/.test(normalized)) {
+      const expanded = normalized.replace("#", "");
+      return `#${expanded.split("").map((char) => char + char).join("")}`;
+    }
+  }
+
+  return "#5865f2";
+}
+
+function generateEmbedsHTML(embeds: unknown[] | undefined, msg?: RenderableMessageInput): string {
+  if (!Array.isArray(embeds) || embeds.length === 0) return "";
+
+  return embeds
+    .map((embed) => {
+      const embedData = embed as RenderableEmbed;
+      const color = normalizeEmbedColor(embedData.color);
+      const authorName = embedData.author?.name ? escapeHtml(embedData.author.name) : "";
+      const authorIcon = embedData.author?.iconURL ? escapeHtml(embedData.author.iconURL) : "";
+      const title = embedData.title ? parseMarkdown(embedData.title, false, msg) : "";
+      const description = embedData.description ? parseMarkdown(embedData.description, false, msg) : "";
+      const fields = getCollectionValues<RenderableEmbedField>(embedData.fields);
+      const footerText = embedData.footer?.text ? escapeHtml(embedData.footer.text) : "";
+      const footerIcon = embedData.footer?.iconURL ? escapeHtml(embedData.footer.iconURL) : "";
+      const thumbnailUrl = embedData.thumbnail?.url ? escapeHtml(embedData.thumbnail.url) : "";
+      const imageUrl = embedData.image?.url ? escapeHtml(embedData.image.url) : "";
+      const url = embedData.url ? escapeHtml(embedData.url) : "";
+
+      const authorHTML = embedData.author?.name
+        ? `<div class="embed-author">${authorIcon ? `<img class="embed-author-avatar" src="${authorIcon}" alt="${authorName}" />` : ""}<span>${authorName}</span></div>`
+        : "";
+
+      const titleHTML = embedData.title
+        ? `<div class="embed-title">${url ? `<a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a>` : title}</div>`
+        : "";
+
+      const descriptionHTML = embedData.description
+        ? `<div class="embed-description">${description}</div>`
+        : "";
+
+      const fieldsHTML = fields.length > 0
+        ? `<div class="embed-fields">${fields.map((field) => {
+            const fieldName = field.name ? escapeHtml(field.name) : "";
+            const fieldValue = field.value ? parseMarkdown(field.value, false, msg) : "";
+            const fieldClass = field.inline ? "embed-field inline" : "embed-field";
+            return `<div class="${fieldClass}"><div class="embed-field-name">${fieldName}</div><div class="embed-field-value">${fieldValue}</div></div>`;
+          }).join("")}</div>`
+        : "";
+
+      const footerHTML = embedData.footer?.text
+        ? `<div class="embed-footer" style="display:flex; align-items:center; gap:6px; margin-top:2px; font-size:12px; color:#949ba4;">${footerIcon ? `<img class="embed-footer-icon" src="${footerIcon}" alt="" style="width:14px;height:14px;border-radius:50%;object-fit:cover;flex-shrink:0;" />` : ""}<span>${footerText}</span></div>`
+        : "";
+
+      const mediaHTML = `${thumbnailUrl ? `<img class="embed-thumbnail" src="${thumbnailUrl}" alt="Thumbnail" style="display:block;width:100%;max-width:400px;border-radius:4px;object-fit:cover;background:#1e1f22;max-height:180px;" />` : ""}${imageUrl ? `<img class="embed-image" src="${imageUrl}" alt="Embed" style="display:block;width:100%;max-width:400px;border-radius:4px;object-fit:cover;background:#1e1f22;max-height:300px;" />` : ""}`;
+
+      return `
+        <div class="embed-container" style="display:flex; align-items:stretch; width:min(100%, 500px); max-width:100%; margin:8px 0 2px; border-radius:4px; overflow:hidden; background:#2b2d31; border:1px solid rgba(255, 255, 255, 0.06); box-sizing:border-box; border-left:4px solid ${color};">
+          <div class="embed-side" style="width:4px; flex-shrink:0; background:${color};"></div>
+          <div class="embed-content" style="flex:1; min-width:0; padding:10px 12px 12px; display:flex; flex-direction:column; gap:6px;">
+            ${authorHTML.replace('class="embed-author"', 'class="embed-author" style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:#f2f3f5;"')}
+            ${titleHTML.replace('class="embed-title"', 'class="embed-title" style="font-size:16px; font-weight:600; line-height:1.3; color:#f2f3f5; margin-top:2px;"')}
+            ${descriptionHTML.replace('class="embed-description"', 'class="embed-description" style="font-size:14px; line-height:1.4; color:#dbdee1; white-space:pre-line;"')}
+            ${fieldsHTML.replace('class="embed-fields"', 'class="embed-fields" style="display:flex; flex-wrap:wrap; gap:10px 16px; margin-top:2px;"').replace('class="embed-field"', 'class="embed-field" style="display:flex; flex-direction:column; gap:2px; min-width:0; flex:1 1 180px;"').replace('class="embed-field-name"', 'class="embed-field-name" style="font-size:12px; font-weight:600; color:#f2f3f5; text-transform:uppercase; letter-spacing:0.02em;"').replace('class="embed-field-value"', 'class="embed-field-value" style="font-size:14px; line-height:1.4; color:#dbdee1; word-break:break-word;"')}
+            ${mediaHTML ? `<div class="embed-media" style="display:flex; flex-direction:column; gap:8px; margin-top:2px;">${mediaHTML}</div>` : ""}
+            ${footerHTML}
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
 /**
  * Generates the inner HTML markup for a Discord message
  * @param avatarURL - User's avatar URL
@@ -775,6 +889,7 @@ function generateMessageMarkup(
   replyMsg: ReplyMessageData | null,
   attachments: RenderableAttachment[],
   stickers: RenderableSticker[],
+  embeds: unknown[] | undefined,
   msg?: RenderableMessageInput,
   compact: boolean = false,
   doLink: boolean = false
@@ -784,6 +899,7 @@ function generateMessageMarkup(
   const replyHTML = generateReplyHTML(replyMsg, msg);
   const attachmentsHTML = generateAttachmentsHTML(attachments);
   const stickersHTML = generateStickersHTML(stickers);
+  const embedsHTML = generateEmbedsHTML(embeds, msg);
   const timestampHTML = buildTimestampHTML(msg ?? {}, timestamp, doLink);
 
   const roleIconHTML = roleIcon
@@ -802,14 +918,14 @@ function generateMessageMarkup(
       ${avatarHTML}
       <div class="content-wrapper">
         ${replyHTML}
-        ${compact ? "" : `<div class="header">
+        ${compact ? `<div class="compact-content">
+          ${parsedContent}
+        </div>` : `<div class="header">
           <span class="username" style="color: ${userColor};">${escapedName}</span>
           ${roleIconHTML}
           ${timestampHTML}
-        </div>`}
-        ${compact ? `<div class="compact-content">
-          ${parsedContent}
-        </div>` : `<div class="content">${parsedContent}</div>`}
+        </div><div class="content">${parsedContent}</div>`}
+        ${embedsHTML}
         ${attachmentsHTML}
         ${stickersHTML}
       </div>
@@ -855,6 +971,7 @@ function generateMessageHTML(
     replyMsg,
     attachments,
     stickers,
+    undefined,
     msg,
     compact,
     doLink
@@ -905,9 +1022,9 @@ function generateMessageHTML(
     }
 
     .message-container.compact-message {
-      padding-top: 2px;
+      padding-top: 0;
       padding-bottom: 2px;
-      min-height: 24px;
+      min-height: auto;
     }
 
     .message-container.compact-message .avatar {
@@ -915,7 +1032,7 @@ function generateMessageHTML(
     }
 
     .message-container.compact-message .content-wrapper {
-      margin-left: 56px;
+      margin-left: 0;
     }
 
     .message-container.compact-message .header {
@@ -924,12 +1041,12 @@ function generateMessageHTML(
 
     .message-container.compact-message .compact-content {
       margin-top: 0;
+      margin-bottom: 0;
       font-size: 16px;
       line-height: 1.375;
       color: #dbdee1;
       word-break: break-word;
       white-space: pre-line;
-      margin-bottom: 2px;
     }
 
     .avatar {
@@ -1704,9 +1821,9 @@ function generateConversationHTML(markup: string[]): string {
     }
 
     .message-container.compact-message {
-      padding-top: 2px;
+      padding-top: 0;
       padding-bottom: 2px;
-      min-height: 24px;
+      min-height: auto;
     }
 
     .message-container.compact-message .avatar {
@@ -1714,7 +1831,7 @@ function generateConversationHTML(markup: string[]): string {
     }
 
     .message-container.compact-message .content-wrapper {
-      margin-left: 56px;
+      margin-left: 0;
     }
 
     .message-container.compact-message .header {
@@ -1723,12 +1840,12 @@ function generateConversationHTML(markup: string[]): string {
 
     .message-container.compact-message .compact-content {
       margin-top: 0;
+      margin-bottom: 0;
       font-size: 16px;
       line-height: 1.375;
       color: #dbdee1;
       word-break: break-word;
       white-space: pre-line;
-      margin-bottom: 2px;
     }
 
     .avatar {
@@ -2507,6 +2624,7 @@ export async function render<T extends RenderOptions['format'] | undefined = und
         replyMsg,
         attachments,
         stickers,
+        Array.isArray(message.embeds) ? message.embeds : [],
         message,
         compact,
         options?.doLink === true
