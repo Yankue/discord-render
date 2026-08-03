@@ -6,4 +6,5 @@ package-lock.json
 test/package-lock.json
 test/node_modules
 test/output.png
+test/output.html
 test/.env
