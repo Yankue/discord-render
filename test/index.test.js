@@ -35,3 +35,22 @@ test('render returns HTML for a list of messages rendered as a conversation', as
   assert.match(html, /General Kenobi/);
   assert.match(html, /discord-conversation/);
 });
+
+test('render accepts a lightweight custom message shape', async () => {
+  const html = await render(
+    [
+      {
+        content: 'Hello from a custom object',
+        username: 'Alice',
+        avatarURL: 'https://example.com/avatar.png',
+        userColor: '#ff00aa',
+      },
+    ],
+    { format: 'html' }
+  );
+
+  assert.equal(typeof html, 'string');
+  assert.match(html, /Hello from a custom object/);
+  assert.match(html, /Alice/);
+  assert.match(html, /ff00aa/);
+});
