@@ -67,13 +67,40 @@ test('render groups consecutive messages from the same user into a compact follo
     { format: 'html' }
   );
 
-  const compactBlock = html.match(/<div class="discord-message" id="message-1">[\s\S]*?<div class="message-container[^>]*compact-message">([\s\S]*?)<\/div>\s*<\/div>/);
+  const compactBlock = html.match(/<div class="discord-message" id="message-1">[\s\S]*?<div class="message-container[^>]*compact-message[^>]*">([\s\S]*?)<\/div>\s*<\/div>/);
 
   assert.ok(compactBlock, 'expected a compact follow-up message block');
   assert.doesNotMatch(compactBlock[1], /class="avatar"/);
   assert.doesNotMatch(compactBlock[1], /<div class="header">/);
-  assert.match(html, /\.message-container\.compact-message\s*\{[\s\S]*?padding-top:\s*0px;[\s\S]*?padding-bottom:\s*0px;[\s\S]*?margin-top:\s*-2px;/);
+  assert.match(html, /\.message-container\.compact-message\s*\{[\s\S]*?padding-top:\s*0px;[\s\S]*?padding-bottom:\s*1px;[\s\S]*?margin-top:\s*-6px;/);
   assert.match(html, /\.message-container\.compact-message \.content-wrapper\s*\{[\s\S]*?margin-left:\s*56px;/);
+  assert.match(html, /\.message-container\.before-compact\s*\{[\s\S]*?padding-bottom:\s*0px;/);
+  assert.match(html, /\.message-container\.compact-message\.end-of-compact-chain\s*\{[\s\S]*?padding-bottom:\s*4px;/);
+});
+
+test('render marks compact chain boundaries for spacing consistency', async () => {
+  const html = await render(
+    [
+      createMessage('A1', '1'),
+      {
+        ...createMessage('A2', '1'),
+        createdAt: new Date('2024-01-01T12:01:00.000Z'),
+      },
+      {
+        ...createMessage('A3', '1'),
+        createdAt: new Date('2024-01-01T12:02:00.000Z'),
+      },
+      {
+        ...createMessage('B1', '2'),
+        createdAt: new Date('2024-01-01T12:03:00.000Z'),
+      },
+    ],
+    { format: 'html' }
+  );
+
+  assert.match(html, /class="message-container before-compact"/);
+  assert.match(html, /class="message-container compact-message"/);
+  assert.match(html, /class="message-container compact-message end-of-compact-chain"/);
 });
 
 test('render outputs rich embed markup for bot-style messages', async () => {

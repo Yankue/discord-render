@@ -892,6 +892,8 @@ function generateMessageMarkup(
   embeds: unknown[] | undefined,
   msg?: RenderableMessageInput,
   compact: boolean = false,
+  beforeCompact: boolean = false,
+  endOfCompactChain: boolean = false,
   doLink: boolean = false
 ): string {
   const parsedContent = parseMarkdown(content, false, msg);
@@ -906,14 +908,17 @@ function generateMessageMarkup(
     ? `<img src="${roleIcon}" alt="Role icon" class="role-icon" />`
     : "";
 
-  const hasReplyClass = replyMsg ? "has-reply" : "";
-  const compactClass = compact ? "compact-message" : "";
+  const containerClasses = ["message-container"];
+  if (replyMsg) containerClasses.push("has-reply");
+  if (compact) containerClasses.push("compact-message");
+  if (beforeCompact) containerClasses.push("before-compact");
+  if (endOfCompactChain) containerClasses.push("end-of-compact-chain");
   const messageId = (msg as RenderableMessage | undefined)?.id;
   const avatarHTML = compact ? "" : `<img src="${avatarURL}" alt="${escapedName}'s avatar" class="avatar" />`;
 
   return `
   <div class="discord-message"${messageId !== undefined && messageId !== null && messageId !== "" ? ` id="message-${messageId}"` : ""}>
-    <div class="message-container ${hasReplyClass} ${compactClass}">
+    <div class="${containerClasses.join(" ")}">
       ${replyMsg ? '<div class="reply-spine-container"><div class="reply-spine"></div></div>' : ""}
       ${avatarHTML}
       <div class="content-wrapper">
@@ -974,6 +979,8 @@ function generateMessageHTML(
     undefined,
     msg,
     compact,
+    false,
+    false,
     doLink
   );
 
@@ -1024,9 +1031,17 @@ function generateMessageHTML(
 
     .message-container.compact-message {
       padding-top: 0px;
-      padding-bottom: 0px;
+      padding-bottom: 1px;
       min-height: auto;
-      margin-top: -20px;
+      margin-top: -6px;
+    }
+
+    .message-container.before-compact {
+      padding-bottom: 0px;
+    }
+
+    .message-container.compact-message.end-of-compact-chain {
+      padding-bottom: 4px;
     }
 
     .message-container.compact-message .avatar {
@@ -1825,9 +1840,18 @@ function generateConversationHTML(markup: string[]): string {
 
     .message-container.compact-message {
       padding-top: 0px;
-      padding-bottom: 0px;
+      padding-bottom: 1px;
       min-height: auto;
-      margin-top: -20px;
+      margin-top: -18px;
+    }
+
+    .message-container.before-compact {
+      padding-bottom: 0px;
+      margin-bottom: -2px;
+    }
+
+    .message-container.compact-message.end-of-compact-chain {
+      padding-bottom: 4px;
     }
 
     .message-container.compact-message .avatar {
@@ -2576,7 +2600,12 @@ export async function render<T extends RenderOptions['format'] | undefined = und
       throw new Error("At least one message is required");
     }
 
-    async function buildMessageMarkup(message: RenderableMessageInput, compact: boolean = false): Promise<string> {
+    async function buildMessageMarkup(
+      message: RenderableMessageInput,
+      compact: boolean = false,
+      beforeCompact: boolean = false,
+      endOfCompactChain: boolean = false
+    ): Promise<string> {
       const hasContent = typeof message.content === "string" && message.content.trim().length > 0;
       const hasEmbeds = Array.isArray(message.embeds) && message.embeds.length > 0;
       const hasAttachments = getCollectionSize(message.attachments) > 0;
@@ -2631,6 +2660,8 @@ export async function render<T extends RenderOptions['format'] | undefined = und
         Array.isArray(message.embeds) ? message.embeds : [],
         message,
         compact,
+        beforeCompact,
+        endOfCompactChain,
         options?.doLink === true
       );
     }
@@ -2653,10 +2684,17 @@ export async function render<T extends RenderOptions['format'] | undefined = und
       ).replace(/<body>[^]*?<\/body>/, `<body>${markup}</body>`);
     }
 
+    const compactFlags = messages.map((message, index) =>
+      index > 0 && shouldCompactMessage(messages[index - 1]!, message)
+    );
+
     const messageMarkup = await Promise.all(
       messages.map((message, index) => {
-        const compact = index > 0 && shouldCompactMessage(messages[index - 1]!, message);
-        return buildMessageMarkup(message, compact);
+        const compact = compactFlags[index] ?? false;
+        const nextCompact = compactFlags[index + 1] ?? false;
+        const beforeCompact = !compact && nextCompact;
+        const endOfCompactChain = compact && !nextCompact;
+        return buildMessageMarkup(message, compact, beforeCompact, endOfCompactChain);
       })
     );
     const html = Array.isArray(msg)
