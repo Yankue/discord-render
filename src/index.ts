@@ -1882,7 +1882,7 @@ function generateConversationHTML(markup: string[]): string {
       border-radius: 50%;
       margin-right: 16px;
       flex-shrink: 0;
-      margin-top: 0px;
+      margin-top: 7px !important;
       margin-bottom: 3px;
       box-sizing: border-box;
       padding: 0;
@@ -1897,6 +1897,7 @@ function generateConversationHTML(markup: string[]): string {
     }
 
     .header {
+      margin-top: 7px;
       display: flex;
       align-items: center;
       gap: 6px;
