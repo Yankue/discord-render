@@ -1,5 +1,5 @@
 import nodeHtmlToImage from 'node-html-to-image';
-import { Message, Attachment, User } from "discord.js";
+import type { Message as DiscordMessage, Attachment as DiscordAttachment, User as DiscordUser } from "discord.js";
 
 export interface RenderOptions {
   width?: number;
@@ -7,8 +7,77 @@ export interface RenderOptions {
   format?: "image" | "html";
 }
 
+export interface RenderableUser {
+  displayName?: string;
+  username?: string;
+  avatarURL?: string | (() => string | null) | null;
+}
+
+export interface RenderableMember {
+  nickname?: string;
+  roles?: {
+    cache?: unknown;
+  };
+}
+
+export interface RenderableAttachment {
+  contentType?: string;
+  url?: string;
+  name?: string;
+  size?: number;
+}
+
+export interface RenderableSticker {
+  id?: string;
+  name?: string;
+}
+
+export interface RenderableGuild {
+  id?: string | number;
+  members?: {
+    cache?: {
+      get?: (id: string | number) => any;
+    };
+  };
+  channels?: {
+    cache?: {
+      get?: (id: string | number) => any;
+    };
+  };
+  roles?: {
+    cache?: {
+      get?: (id: string | number) => any;
+    };
+  };
+}
+
+export interface RenderableMessage {
+  content?: string;
+  createdAt?: Date | string | number;
+  embeds?: unknown[];
+  attachments?: Array<RenderableAttachment> | { size?: number; values?: () => RenderableAttachment[] } | null;
+  stickers?: Array<RenderableSticker> | { size?: number; values?: () => RenderableSticker[] } | null;
+  reference?: { messageId?: string | number } | null;
+  channel?: {
+    messages?: {
+      fetch?: (messageId: string | number) => Promise<RenderableMessage | null>;
+    };
+  } | null;
+  guild?: RenderableGuild | null;
+  author?: RenderableUser | null;
+  member?: RenderableMember | null;
+  username?: string;
+  avatarURL?: string | null;
+  userColor?: string;
+  name?: string;
+  roleIcon?: string | null;
+  reply?: ReplyMessageData | null;
+}
+
+export type RenderableMessageInput = RenderableMessage | DiscordMessage;
+
 export interface ReplyMessageData {
-  author?: User;
+  author?: RenderableUser | null;
   content?: string;
   avatarURL?: string;
   name?: string;
@@ -45,44 +114,47 @@ function formatDiscordTimestamp(date: Date): string {
  * @param msg - The Discord message to extract user info from
  * @returns Object containing avatar URL, display name, user color, and role icon
  */
-function extractUserInfo(msg: Message): {
+function extractUserInfo(msg: RenderableMessageInput): {
   avatarURL: string;
   name: string;
   userColor: string;
   roleIcon: string | null;
 } {
-  if (msg.author) {
-    const avatarURL = msg.author.avatarURL() || "https://cdn.discordapp.com/embed/avatars/0.png";
-    let name = msg.author.displayName;
-    let userColor = "#ffffff";
-    let roleIcon: string | null = null;
+  const customMsg = msg as RenderableMessage;
+  const author = customMsg.author;
 
-    if (msg.member) {
-      name = msg.member.nickname || msg.author.displayName;
+  const authorAvatar = author?.avatarURL
+    ? typeof author.avatarURL === "function"
+      ? author.avatarURL()
+      : author.avatarURL
+    : null;
 
-      const roles = msg.member.roles.cache
-        .filter((role) => role.color !== 0 && (!msg.guild || role.id !== msg.guild.id))
-        .sort((a, b) => b.position - a.position);
+  const avatarURL = customMsg.avatarURL || authorAvatar || "https://cdn.discordapp.com/embed/avatars/0.png";
+  let name = customMsg.username || customMsg.name || author?.displayName || author?.username || "Unknown User";
+  let userColor = customMsg.userColor || "#ffffff";
+  let roleIcon: string | null = customMsg.roleIcon || null;
+
+  if (customMsg.member) {
+    name = customMsg.member.nickname || name;
+
+    const rolesCache = (customMsg.member as { roles?: { cache?: any } } | undefined)?.roles?.cache;
+    if (rolesCache && typeof rolesCache.filter === "function") {
+      const roles = rolesCache
+        .filter((role: { color?: number; id?: string }) => role.color !== 0 && (!customMsg.guild || role.id !== customMsg.guild.id))
+        .sort((a: { position?: number }, b: { position?: number }) => (b.position ?? 0) - (a.position ?? 0));
 
       const highestColoredRole = roles.first();
 
       if (highestColoredRole) {
-        userColor = `#${highestColoredRole.color.toString(16).padStart(6, "0")}`;
-        if (highestColoredRole.iconURL()) {
+        userColor = `#${(highestColoredRole.color ?? 0).toString(16).padStart(6, "0")}`;
+        if (typeof highestColoredRole.iconURL === "function") {
           roleIcon = highestColoredRole.iconURL();
         }
       }
     }
-
-    return { avatarURL, name, userColor, roleIcon };
-  } else {
-    return {
-      avatarURL: "https://cdn.discordapp.com/embed/avatars/0.png",
-      name: "Unknown User",
-      userColor: "#ffffff",
-      roleIcon: null,
-    };
   }
+
+  return { avatarURL, name, userColor, roleIcon };
 }
 
 /**
@@ -90,30 +162,35 @@ function extractUserInfo(msg: Message): {
  * @param referencedMessage - The referenced message
  * @returns Object containing avatar URL, name, and user color
  */
-async function extractReplyUserInfo(referencedMessage: Message): Promise<{
+async function extractReplyUserInfo(referencedMessage: RenderableMessageInput): Promise<{
   avatarURL: string;
   name: string;
   userColor: string;
 }> {
-  const avatarURL =
-    referencedMessage.author.avatarURL() || "https://cdn.discordapp.com/embed/avatars/0.png";
-  let name = referencedMessage.author.displayName;
-  let userColor = "#b5bac1";
+  const authorAvatar = referencedMessage.author?.avatarURL
+    ? typeof referencedMessage.author.avatarURL === "function"
+      ? referencedMessage.author.avatarURL()
+      : referencedMessage.author.avatarURL
+    : null;
 
-  if (referencedMessage.member) {
-    name = referencedMessage.member.nickname || referencedMessage.author.displayName;
+  const avatarURL = authorAvatar || (referencedMessage as RenderableMessage).avatarURL || "https://cdn.discordapp.com/embed/avatars/0.png";
+  let name = (referencedMessage as RenderableMessage).username || referencedMessage.author?.displayName || referencedMessage.author?.username || "Unknown User";
+  let userColor = (referencedMessage as RenderableMessage).userColor || "#b5bac1";
 
-    const roles = referencedMessage.member.roles.cache
-      .filter(
-        (role) =>
-          role.color !== 0 && (!referencedMessage.guild || role.id !== referencedMessage.guild.id)
-      )
-      .sort((a, b) => b.position - a.position);
+  if ((referencedMessage as RenderableMessage).member) {
+    name = (referencedMessage as RenderableMessage).member?.nickname || name;
 
-    const highestColoredRole = roles.first();
+    const rolesCache = ((referencedMessage as RenderableMessage).member as { roles?: { cache?: any } } | undefined)?.roles?.cache;
+    if (rolesCache && typeof rolesCache.filter === "function") {
+      const roles = rolesCache
+        .filter((role: { color?: number; id?: string }) => role.color !== 0 && (!referencedMessage.guild || role.id !== referencedMessage.guild.id))
+        .sort((a: { position?: number }, b: { position?: number }) => (b.position ?? 0) - (a.position ?? 0));
 
-    if (highestColoredRole) {
-      userColor = `#${highestColoredRole.color.toString(16).padStart(6, "0")}`;
+      const highestColoredRole = roles.first();
+
+      if (highestColoredRole) {
+        userColor = `#${(highestColoredRole.color ?? 0).toString(16).padStart(6, "0")}`;
+      }
     }
   }
 
@@ -134,6 +211,44 @@ function escapeHtml(text: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function getCollectionValues<T>(collection: unknown): T[] {
+  if (Array.isArray(collection)) {
+    return collection as T[];
+  }
+
+  if (
+    collection &&
+    typeof collection === "object" &&
+    "values" in collection &&
+    typeof (collection as { values?: unknown }).values === "function"
+  ) {
+    return Array.from((collection as { values: () => Iterable<T> }).values());
+  }
+
+  return [];
+}
+
+function getCollectionSize(collection: unknown): number {
+  if (Array.isArray(collection)) {
+    return collection.length;
+  }
+
+  if (collection && typeof collection === "object") {
+    if ("size" in collection && typeof (collection as { size?: unknown }).size === "number") {
+      return (collection as { size: number }).size;
+    }
+
+    if (
+      "values" in collection &&
+      typeof (collection as { values?: unknown }).values === "function"
+    ) {
+      return Array.from((collection as { values: () => Iterable<unknown> }).values()).length;
+    }
+  }
+
+  return 0;
+}
+
 function getEmojiUrl(emoji: string): string | null {
   const codePoint = emoji.codePointAt(0);
   if (!codePoint) return null;
@@ -150,7 +265,7 @@ function getEmojiUrl(emoji: string): string | null {
  * @param msg - The Discord message object for resolving mentions
  * @returns HTML string with parsed markdown
  */
-function parseMarkdown(content: string, isReply: boolean = false, msg?: Message): string {
+function parseMarkdown(content: string, isReply: boolean = false, msg?: RenderableMessageInput): string {
   const emojiOnlyRegex =
     /^[\s\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]*(?:<a?:[^:]+:\d+>[\s]*)*$/u;
   const hasText = !emojiOnlyRegex.test(content.trim());
@@ -292,11 +407,12 @@ function parseMarkdown(content: string, isReply: boolean = false, msg?: Message)
 
   // User mentions <@123456789>
   parsed = parsed.replace(/&lt;@!?(\d+)&gt;/g, (match, userId) => {
-    if (msg && msg.guild) {
+    const guild = (msg as RenderableMessage | undefined)?.guild;
+    if (guild?.members?.cache) {
       try {
-        const member = msg.guild.members.cache.get(userId);
+        const member = guild.members.cache.get?.(userId);
         if (member) {
-          const displayName = member.nickname || member.user.displayName || member.user.username;
+          const displayName = member.nickname || member.user?.displayName || member.user?.username;
           return `<span class="mention user-mention">@${escapeHtml(displayName)}</span>`;
         }
       } catch {}
@@ -306,11 +422,12 @@ function parseMarkdown(content: string, isReply: boolean = false, msg?: Message)
 
   // Channel mentions <#123456789>
   parsed = parsed.replace(/&lt;#(\d+)&gt;/g, (match, channelId) => {
-    if (msg && msg.guild) {
+    const guild = (msg as RenderableMessage | undefined)?.guild;
+    if (guild?.channels?.cache) {
       try {
-        const channel = msg.guild.channels.cache.get(channelId);
-        if (channel && "name" in channel) {
-          return `<span class="mention channel-mention">#${escapeHtml(channel.name)}</span>`;
+        const channel = guild.channels.cache.get?.(channelId);
+        if (channel && typeof channel === "object" && "name" in channel) {
+          return `<span class="mention channel-mention">#${escapeHtml(channel.name as string)}</span>`;
         }
       } catch {}
     }
@@ -319,11 +436,12 @@ function parseMarkdown(content: string, isReply: boolean = false, msg?: Message)
 
   // Role mentions <@&123456789>
   parsed = parsed.replace(/&lt;@&amp;(\d+)&gt;/g, (match, roleId) => {
-    if (msg && msg.guild) {
+    const guild = (msg as RenderableMessage | undefined)?.guild;
+    if (guild?.roles?.cache) {
       try {
-        const role = msg.guild.roles.cache.get(roleId);
-        if (role) {
-          return `<span class="mention role-mention">@${escapeHtml(role.name)}</span>`;
+        const role = guild.roles.cache.get?.(roleId);
+        if (role && typeof role === "object" && "name" in role) {
+          return `<span class="mention role-mention">@${escapeHtml(role.name as string)}</span>`;
         }
       } catch {}
     }
@@ -339,7 +457,7 @@ function parseMarkdown(content: string, isReply: boolean = false, msg?: Message)
  * @param msg - The Discord message object for mention resolution
  * @returns HTML string for the reply or empty string if no reply
  */
-function generateReplyHTML(replyMsg: ReplyMessageData | null, msg?: Message): string {
+function generateReplyHTML(replyMsg: ReplyMessageData | null, msg?: RenderableMessageInput): string {
   if (!replyMsg) return "";
 
   const replyAuthor = escapeHtml(replyMsg.name || "Unknown User");
@@ -373,13 +491,13 @@ function generateReplyHTML(replyMsg: ReplyMessageData | null, msg?: Message): st
  * @param attachments - Array of Discord attachments
  * @returns HTML string for all attachments or empty string if none
  */
-function generateAttachmentsHTML(attachments: Attachment[]): string {
+function generateAttachmentsHTML(attachments: RenderableAttachment[]): string {
   if (!attachments || attachments.length === 0) return "";
 
   const count = attachments.length;
   let html = '<div class="attachments">';
 
-  const createImageElement = (attachment: Attachment, className: string) => {
+  const createImageElement = (attachment: RenderableAttachment, className: string) => {
     const isImage = attachment.contentType?.startsWith("image/");
     const isVideo = attachment.contentType?.startsWith("video/");
 
@@ -566,7 +684,7 @@ function formatFileSize(bytes: number): string {
  * @param stickers - Array of Discord stickers
  * @returns HTML string for all stickers or empty string if none
  */
-function generateStickersHTML(stickers: any[]): string {
+function generateStickersHTML(stickers: RenderableSticker[]): string {
   if (!stickers || stickers.length === 0) return "";
 
   let html = '<div class="stickers">';
@@ -608,9 +726,9 @@ function generateMessageMarkup(
   timestamp: string,
   roleIcon: string | null,
   replyMsg: ReplyMessageData | null,
-  attachments: Attachment[],
-  stickers: any[],
-  msg?: Message
+  attachments: RenderableAttachment[],
+  stickers: RenderableSticker[],
+  msg?: RenderableMessageInput
 ): string {
   const parsedContent = parseMarkdown(content, false, msg);
   const escapedName = escapeHtml(name);
@@ -666,9 +784,9 @@ function generateMessageHTML(
   timestamp: string,
   roleIcon: string | null,
   replyMsg: ReplyMessageData | null,
-  attachments: Attachment[],
-  stickers: any[],
-  msg?: Message
+  attachments: RenderableAttachment[],
+  stickers: RenderableSticker[],
+  msg?: RenderableMessageInput
 ): string {
   const markup = generateMessageMarkup(
     avatarURL,
@@ -2189,7 +2307,7 @@ function generateConversationHTML(markup: string[]): string {
  * @throws Error if message is invalid or rendering fails
  */
 export async function render(
-  msg: Message | Message[],
+  msg: RenderableMessageInput | RenderableMessageInput[],
   options: RenderOptions = {}
 ): Promise<string | Buffer<ArrayBufferLike> | (string | Buffer<ArrayBufferLike>)[]> {
   try {
@@ -2202,44 +2320,53 @@ export async function render(
       throw new Error("At least one message is required");
     }
 
-    async function buildMessageMarkup(message: Message): Promise<string> {
-      const hasContent = message.content && message.content.trim().length > 0;
-      const hasEmbeds = message.embeds.length > 0;
-      const hasAttachments = message.attachments.size > 0;
-      const hasStickers = message.stickers.size > 0;
+    async function buildMessageMarkup(message: RenderableMessageInput): Promise<string> {
+      const hasContent = typeof message.content === "string" && message.content.trim().length > 0;
+      const hasEmbeds = Array.isArray(message.embeds) && message.embeds.length > 0;
+      const hasAttachments = getCollectionSize(message.attachments) > 0;
+      const hasStickers = getCollectionSize(message.stickers) > 0;
 
       if (!hasContent && !hasEmbeds && !hasAttachments && !hasStickers) {
         throw new Error("Message must have content, embeds, attachments, or stickers to render");
       }
 
       const { avatarURL, name, userColor, roleIcon } = extractUserInfo(message);
-      const timestamp = formatDiscordTimestamp(message.createdAt);
+      const timestamp = formatDiscordTimestamp(new Date(message.createdAt ?? Date.now()));
 
       let replyMsg: ReplyMessageData | null = null;
       if (message.reference && message.reference.messageId) {
-        try {
-          const referencedMessage = await message.channel.messages.fetch(message.reference.messageId);
-          const replyUserInfo = await extractReplyUserInfo(referencedMessage);
-          replyMsg = {
-            author: referencedMessage.author,
-            content: referencedMessage.content,
-            avatarURL: replyUserInfo.avatarURL,
-            name: replyUserInfo.name,
-            userColor: replyUserInfo.userColor,
-          };
-        } catch (error) {
-          console.warn("Could not fetch referenced message:", error);
+        const channel = (message as RenderableMessage).channel;
+        const fetchMessage = channel?.messages?.fetch as
+          | ((messageId: string | number) => Promise<RenderableMessage | null>)
+          | undefined;
+
+        if (typeof fetchMessage === "function") {
+          try {
+            const referencedMessage = await fetchMessage(message.reference.messageId);
+            if (referencedMessage) {
+              const replyUserInfo = await extractReplyUserInfo(referencedMessage);
+              replyMsg = {
+                author: referencedMessage.author,
+                content: referencedMessage.content,
+                avatarURL: replyUserInfo.avatarURL,
+                name: replyUserInfo.name,
+                userColor: replyUserInfo.userColor,
+              };
+            }
+          } catch (error) {
+            console.warn("Could not fetch referenced message:", error);
+          }
         }
       }
 
-      const attachments = Array.from(message.attachments.values());
-      const stickers = Array.from(message.stickers.values());
+      const attachments = getCollectionValues<RenderableAttachment>(message.attachments);
+      const stickers = getCollectionValues<RenderableSticker>(message.stickers);
 
       return generateMessageMarkup(
         avatarURL,
         name,
         userColor,
-        message.content,
+        message.content ?? "",
         timestamp,
         roleIcon,
         replyMsg,
@@ -2249,7 +2376,7 @@ export async function render(
       );
     }
 
-    async function buildMessageDocument(message: Message): Promise<string> {
+    async function buildMessageDocument(message: RenderableMessageInput): Promise<string> {
       const markup = await buildMessageMarkup(message);
       return generateMessageHTML(
         "",

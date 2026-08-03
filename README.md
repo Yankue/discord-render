@@ -1,67 +1,93 @@
 # Discord Render
-This is an open-source project to render Discord messages into images.
-It does this using a clone of Discord's styling. This means it isn't 100% identical, but it is close enough for most uses. It has support for message contents (with markdown), embeds, attachments, stickers, emojis, role icons, role colours.
 
-It is built to work with Discord.JS; the message objects can be passed straight in.
-It would be quite easy to modify this library to generate custom Discord messages without Discord.JS, but it currently isn't a built-in feature.
+Discord Render lets you turn Discord-style messages into PNG images or HTML previews.
+It supports message content with markdown, embeds, attachments, stickers, emojis, role icons, and role colours.
+
+It works with real Discord.js message objects, and it also accepts lightweight plain objects so you can generate fake or custom message previews for websites and demos.
 
 ## Installation
-```cmd
-npm i discord-render
+```bash
+npm install discord-render
 ```
 
 ## Usage
-### Rendering a single message as an image
+
+### Rendering a single message as an image (discord.js)
 ```js
-// use your own message variable from your discord bot, not an empty constructed one!
-const message = new Message()
+import { render } from "discord-render";
+import { Message } from "discord.js";
 
-render(message).then(imageBuffer => {
-
-})
+const message = new Message(); // replace this with your discord.js message variable!
+const imageBuffer = await render(message);
 ```
 
-### Rendering several messages together as an image
+### Rendering several messages together as an image (NOT discord.js)
 ```js
-const messages = [new Message(), new Message(), new Message()]
+import { render } from "discord-render";
 
-render(messages).then(imageBuffer => {
+const messages = [
+  {
+    content: "First message",
+    username: "Alice",
+    avatarURL: "https://example.com/alice.png",
+    userColor: "#5865f2",
+  },
+  {
+    content: "Second message",
+    username: "Bob",
+    avatarURL: "https://example.com/bob.png",
+    userColor: "#57f287",
+  },
+];
 
-})
+const image = await render(messages);
 ```
 
 ### Exporting a single message as HTML
 ```js
-const html = await render(message, { format: 'html' })
+const html = await render(message, { format: "html" });
 ```
 
 ### Exporting several messages together as HTML
 ```js
-const html = await render(messages, { format: 'html' })
+const html = await render(messages, { format: "html" });
 ```
 
+### Custom object shape
+You can supply a plain object with any of the following fields:
 
-## Full Discord.JS Examples
+- `content`
+- `username` or `name`
+- `avatarURL`
+- `userColor`
+- `roleIcon`
+- `createdAt`
+- `embeds`
+- `attachments`
+- `stickers`
+- `reference`
+
+This makes the library useful for website previews, mockups, and other non-bot use cases.
+
+## Full Discord.js example
 ```js
-import { render } from "discord-render"
-import { Client } from "discord.js"
-import fs from "fs"
-import 'dotenv/config'
+import { render } from "discord-render";
+import { Client } from "discord.js";
+import fs from "fs";
+import "dotenv/config";
 
-const client = new Client({intents: 38403})
-
+const client = new Client({ intents: 38403 });
 
 client.on("ready", () => {
-	console.log("Ready!")
-})
+  console.log("Ready!");
+});
 
-client.on("messageCreate", async msg => {
-	if(msg.content.startsWith("s")) {
-		render(msg).then(buffer => {
-			fs.writeFile("./output.png", buffer, () => {})
-		})
-	}
-})
+client.on("messageCreate", async (msg) => {
+  if (msg.content.startsWith("s")) {
+    const buffer = await render(msg);
+    fs.writeFileSync("./output.png", buffer);
+  }
+});
 
-client.login(process.env.TOKEN)
+client.login(process.env.TOKEN);
 ```
