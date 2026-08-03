@@ -1,6 +1,6 @@
 {
   "name": "discord-render",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Render discord messages to an image!",
   "repository": "https://github.com/Yankue/discord-render",
   "type": "module",
@@ -14,7 +14,7 @@
     }
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "npm run build && node --test test/index.test.js",
     "build": "tsup src/index.ts --format esm,cjs --dts"
   },
   "files": [

@@ -4,6 +4,7 @@ import { Message, Attachment, User } from "discord.js";
 export interface RenderOptions {
   width?: number;
   height?: number;
+  format?: "image" | "html";
 }
 
 export interface ReplyMessageData {
@@ -586,6 +587,64 @@ function generateStickersHTML(stickers: any[]): string {
 }
 
 /**
+ * Generates the inner HTML markup for a Discord message
+ * @param avatarURL - User's avatar URL
+ * @param name - User's display name
+ * @param userColor - User's role color
+ * @param content - Message content
+ * @param timestamp - Formatted timestamp
+ * @param roleIcon - User's role icon URL or null
+ * @param replyMsg - Reply message data or null
+ * @param attachments - Array of message attachments
+ * @param stickers - Array of message stickers
+ * @param msg - The Discord message object for mention resolution
+ * @returns Inner HTML string for the message
+ */
+function generateMessageMarkup(
+  avatarURL: string,
+  name: string,
+  userColor: string,
+  content: string,
+  timestamp: string,
+  roleIcon: string | null,
+  replyMsg: ReplyMessageData | null,
+  attachments: Attachment[],
+  stickers: any[],
+  msg?: Message
+): string {
+  const parsedContent = parseMarkdown(content, false, msg);
+  const escapedName = escapeHtml(name);
+  const replyHTML = generateReplyHTML(replyMsg, msg);
+  const attachmentsHTML = generateAttachmentsHTML(attachments);
+  const stickersHTML = generateStickersHTML(stickers);
+
+  const roleIconHTML = roleIcon
+    ? `<img src="${roleIcon}" alt="Role icon" class="role-icon" />`
+    : "";
+
+  const hasReplyClass = replyMsg ? "has-reply" : "";
+
+  return `
+  <div class="discord-message">
+    <div class="message-container ${hasReplyClass}">
+      ${replyMsg ? '<div class="reply-spine-container"><div class="reply-spine"></div></div>' : ""}
+      <img src="${avatarURL}" alt="${escapedName}'s avatar" class="avatar" />
+      <div class="content-wrapper">
+        ${replyHTML}
+        <div class="header">
+          <span class="username" style="color: ${userColor};">${escapedName}</span>
+          ${roleIconHTML}
+          <span class="timestamp">${timestamp}</span>
+        </div>
+        <div class="content">${parsedContent}</div>
+        ${attachmentsHTML}
+        ${stickersHTML}
+      </div>
+    </div>
+  </div>`;
+}
+
+/**
  * Generates the complete HTML for a Discord message
  * @param avatarURL - User's avatar URL
  * @param name - User's display name
@@ -611,17 +670,18 @@ function generateMessageHTML(
   stickers: any[],
   msg?: Message
 ): string {
-  const parsedContent = parseMarkdown(content, false, msg);
-  const escapedName = escapeHtml(name);
-  const replyHTML = generateReplyHTML(replyMsg, msg);
-  const attachmentsHTML = generateAttachmentsHTML(attachments);
-  const stickersHTML = generateStickersHTML(stickers);
-
-  const roleIconHTML = roleIcon
-    ? `<img src="${roleIcon}" alt="Role icon" class="role-icon" />`
-    : "";
-
-  const hasReplyClass = replyMsg ? "has-reply" : "";
+  const markup = generateMessageMarkup(
+    avatarURL,
+    name,
+    userColor,
+    content,
+    timestamp,
+    roleIcon,
+    replyMsg,
+    attachments,
+    stickers,
+    msg
+  );
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1349,39 +1409,787 @@ function generateMessageHTML(
       text-align: center;
       word-break: break-word;
     }
+
+    .discord-conversation {
+      background: #313338;
+      padding: 8px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      min-width: 400px;
+      max-width: 800px;
+    }
+
+    .discord-conversation .discord-message {
+      padding: 0 12px;
+      min-width: 0;
+      max-width: none;
+    }
   </style>
 </head>
 <body>
-  <div class="discord-message">
-    <div class="message-container ${hasReplyClass}">
-      ${replyMsg ? '<div class="reply-spine-container"><div class="reply-spine"></div></div>' : ""}
-      <img src="${avatarURL}" alt="${escapedName}'s avatar" class="avatar" />
-      <div class="content-wrapper">
-        ${replyHTML}
-        <div class="header">
-          <span class="username" style="color: ${userColor};">${escapedName}</span>
-          ${roleIconHTML}
-          <span class="timestamp">${timestamp}</span>
-        </div>
-        <div class="content">${parsedContent}</div>
-        ${attachmentsHTML}
-        ${stickersHTML}
-      </div>
-    </div>
+  ${markup}
+</body>
+</html>`;
+}
+
+function generateConversationHTML(markup: string[]): string {
+  const conversationMarkup = markup.join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      background: #313338;
+      color: #dbdee1;
+      font-family: "gg sans", "Noto Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    .discord-conversation {
+      background: #313338;
+      padding: 8px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      min-width: 400px;
+      max-width: 800px;
+    }
+
+    .discord-message {
+      background: #313338;
+      padding: 0 12px;
+      min-width: 400px;
+      max-width: 800px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .message-container {
+      display: flex;
+      align-items: flex-start;
+      position: relative;
+      padding: 12px 0;
+      min-height: 44px;
+    }
+
+    .message-container.has-reply {
+      align-items: flex-start;
+    }
+
+    .message-container.has-reply .avatar {
+      margin-top: 22px;
+    }
+
+    .message-container:not(.has-reply) .avatar {
+      margin-top: 0px;
+    }
+
+    .avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      margin-right: 16px;
+      flex-shrink: 0;
+      margin-top: 0px;
+      margin-bottom: 3px;
+      box-sizing: border-box;
+      padding: 0;
+      background: #313338;
+      position: relative;
+      z-index: 2;
+    }
+
+    .content-wrapper {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 2px;
+    }
+
+    .username {
+      font-weight: 500;
+      font-size: 16px;
+      color: var(--user-color, #dbdee1);
+      line-height: 1.375;
+    }
+
+    .role-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 3px;
+      object-fit: contain;
+      margin-left: 2px;
+      margin-right: 2px;
+      vertical-align: middle;
+    }
+
+    .timestamp {
+      font-size: 12px;
+      color: #949ba4;
+      font-weight: 400;
+      margin-left: 6px;
+      line-height: 1.375;
+    }
+
+    .content {
+      font-size: 16px;
+      line-height: 1.375;
+      color: #dbdee1;
+      word-break: break-word;
+      white-space: pre-line;
+      margin-bottom: 2px;
+    }
+
+    .emoji {
+      vertical-align: -0.2em;
+      object-fit: contain;
+    }
+
+    .reply-emoji {
+      width: 16px;
+      height: 16px;
+      vertical-align: -0.1em;
+    }
+
+    .text-emoji {
+      width: 18px;
+      height: 18px;
+      vertical-align: -0.2em;
+    }
+
+    .large-emoji {
+      width: 45px;
+      height: 45px;
+      vertical-align: -0.3em;
+      margin: 2px;
+    }
+
+    .direct-image-container {
+      margin: 4px 0;
+      display: block;
+    }
+
+    .direct-image {
+      max-width: 400px;
+      max-height: 300px;
+      border-radius: 8px;
+      object-fit: contain;
+      display: block;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+    }
+
+    .reply-wrapper {
+      position: relative;
+      margin-bottom: 4px;
+      margin-left: 0px;
+    }
+
+    .reply-spine-container {
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      width: 24px;
+      height: 10px;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .reply-spine {
+      width: 100%;
+      height: 100%;
+      border-top: 2px solid #4e5058;
+      border-right: 2px solid #4e5058;
+      border-top-right-radius: 6px;
+      background: transparent;
+      transform: rotate(180deg) scaleY(-1);
+    }
+
+    .reply-container {
+      display: flex;
+      align-items: center;
+      padding-left: 0px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .reply-spine::before {
+      display: none;
+    }
+
+    .reply-avatar {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-left: 0px;
+      margin-right: 8px;
+    }
+
+    .reply-content {
+      display: flex;
+      align-items: center;
+      min-width: 0;
+      gap: 4px;
+    }
+
+    .reply-author {
+      font-size: 13px;
+      font-weight: 600;
+      color: #b5bac1;
+      flex-shrink: 0;
+    }
+
+    .reply-text {
+      font-size: 13px;
+      color: #b5bac1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 200px;
+    }
+
+    .attachments {
+      margin-top: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 0px;
+      max-width: 800px;
+    }
+
+    .attachment-item {
+      border-radius: 8px;
+      overflow: hidden;
+      background: transparent;
+      position: relative;
+    }
+
+    .attachment-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      border-radius: 8px;
+      background: transparent;
+      aspect-ratio: 1/1;
+    }
+
+    .attachment-video {
+      width: 100%;
+      height: 100%;
+      border-radius: 8px;
+      background: #232428;
+      object-fit: contain;
+    }
+
+    .grid-1 .single {
+      max-width: 400px;
+      max-height: 400px;
+      aspect-ratio: 1/1;
+    }
+
+    .grid-2 {
+      display: flex;
+      gap: 2px;
+      height: 200px;
+    }
+
+    .grid-2 .half {
+      height: 100%;
+      aspect-ratio: 1/1;
+    }
+
+    .grid-3 {
+      display: flex;
+      gap: 2px;
+      height: 200px;
+    }
+
+    .grid-3 .left-big {
+      height: 100%;
+    }
+
+    .grid-3 .right-small {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      height: 100%;
+    }
+
+    .grid-3 .big {
+      height: 100%;
+      aspect-ratio: 1/1;
+    }
+
+    .grid-3 .small {
+      height: calc(50% - 1px);
+      aspect-ratio: 1/1;
+    }
+
+    .grid-4 {
+      display: flex;
+      gap: 2px;
+      height: 200px;
+    }
+
+    .grid-4 .left-column, .grid-4 .right-column {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      height: 100%;
+    }
+
+    .grid-4 .quarter {
+      height: calc(50% - 1px);
+      aspect-ratio: 1/1;
+    }
+
+    .grid-5 {
+      display: flex;
+      flex-direction: column;
+      gap: 0px;
+    }
+
+    .grid-5 .top-row {
+      display: flex;
+      gap: 2px;
+      height: 150px;
+    }
+
+    .grid-5 .bottom-row {
+      display: flex;
+      gap: 2px;
+      height: 100px;
+    }
+
+    .grid-5 .half {
+      height: 100%;
+      aspect-ratio: 1/1;
+    }
+
+    .grid-5 .third {
+      height: 100%;
+      aspect-ratio: 1/1;
+    }
+
+    .grid-6 {
+      display: flex;
+      flex-direction: column;
+      gap: 0px;
+    }
+
+    .grid-6 .top-row, .grid-6 .bottom-row {
+      display: flex;
+      gap: 2px;
+      height: 120px;
+    }
+
+    .grid-6 .third {
+      height: 100%;
+      aspect-ratio: 1/1;
+    }
+
+    .grid-7 {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .grid-7 .top-big {
+      height: 200px;
+      width: 100%;
+    }
+
+    .grid-7 .big-top {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      aspect-ratio: auto;
+    }
+
+    .grid-7 .middle-row {
+      flex: 1;
+      display: flex;
+      gap: 2px;
+      height: 80px;
+    }
+
+    .grid-7 .bottom-row {
+      flex: 1;
+      display: flex;
+      gap: 2px;
+      height: 80px;
+    }
+
+    .grid-7 .third {
+      height: 100%;
+      aspect-ratio: 1/1;
+    }
+
+    .grid-8 {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .grid-8 .top-row {
+      flex: 1;
+      display: flex;
+      gap: 2px;
+      height: 150px;
+    }
+
+    .grid-8 .middle-row {
+      flex: 1;
+      display: flex;
+      gap: 2px;
+      height: 80px;
+    }
+
+    .grid-8 .bottom-row {
+      flex: 1;
+      display: flex;
+      gap: 2px;
+      height: 80px;
+    }
+
+    .grid-8 .half {
+      flex: 1;
+      height: 100%;
+      aspect-ratio: 1/1;
+    }
+
+    .grid-8 .third {
+      flex: 1;
+      height: 100%;
+      aspect-ratio: 1/1;
+    }
+
+    .grid-9 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2px;
+    }
+
+    .grid-9 .ninth {
+      height: 100%;
+      aspect-ratio: 1/1;
+    }
+
+    .grid-10 {
+      display: flex;
+      flex-direction: column;
+      gap: 0px;
+    }
+
+    .grid-10 .top-big {
+      height: 200px;
+      aspect-ratio: 1/1;
+    }
+
+    .grid-10 .bottom-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2px;
+    }
+
+    .grid-10 .ninth {
+      height: 100%;
+      aspect-ratio: 1/1;
+    }
+
+    .more-overlay {
+      position: relative;
+    }
+
+    .more-count {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 16px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .file-attachment {
+      background: #232428;
+      border-radius: 8px;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 60px;
+    }
+
+    .file-icon {
+      font-size: 24px;
+    }
+
+    .file-name {
+      color: #00aff4;
+      font-weight: 500;
+      font-size: 15px;
+    }
+
+    .file-size {
+      color: #949ba4;
+      font-size: 12px;
+    }
+
+    .mention {
+      background: rgba(88, 101, 242, 0.3);
+      color: #dee0fc;
+      padding: 0 2px;
+      border-radius: 3px;
+      font-weight: 500;
+    }
+
+    .subtext {
+      font-size: 14px;
+      color: #b5bac1;
+      line-height: 1.375;
+    }
+
+    .user-mention {
+      background: rgba(88, 101, 242, 0.3);
+      color: #dee0fc;
+    }
+
+    .channel-mention {
+      background: rgba(88, 101, 242, 0.3);
+      color: #dee0fc;
+    }
+
+    .role-mention {
+      background: rgba(88, 101, 242, 0.3);
+      color: #dee0fc;
+    }
+
+    .code-block {
+      background: #2b2d31;
+      border: 1px solid #1e1f22;
+      border-radius: 4px;
+      padding: 8px;
+      margin: 8px 0;
+      overflow-x: auto;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.125;
+      color: #dbdee1;
+    }
+
+    .inline-code {
+      background: #1e1f22;
+      color: #dbdee1;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 14px;
+    }
+
+    .header-1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin: 16px 0 8px 0;
+      color: #dbdee1;
+      line-height: 1.25;
+    }
+
+    .header-2 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 16px 0 8px 0;
+      color: #dbdee1;
+      line-height: 1.25;
+    }
+
+    .header-3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 16px 0 8px 0;
+      color: #dbdee1;
+      line-height: 1.25;
+    }
+
+    .header-4 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 16px 0 8px 0;
+      color: #dbdee1;
+      line-height: 1.25;
+    }
+
+    .header-5 {
+      font-size: 14px;
+      font-weight: 600;
+      margin: 16px 0 8px 0;
+      color: #dbdee1;
+      line-height: 1.25;
+    }
+
+    .header-6 {
+      font-size: 12px;
+      font-weight: 600;
+      margin: 16px 0 8px 0;
+      color: #dbdee1;
+      line-height: 1.25;
+    }
+
+    .blockquote {
+      border-left: 4px solid #4e5058;
+      padding-left: 12px;
+      margin: 8px 0;
+      color: #b5bac1;
+      font-style: italic;
+    }
+
+    .unordered-list, .ordered-list {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .list-item, .list-item-ordered {
+      margin: 4px 0;
+      color: #dbdee1;
+    }
+
+    .markdown-table {
+      border-collapse: collapse;
+      margin: 8px 0;
+      background: #2b2d31;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .table-row {
+      border-bottom: 1px solid #1e1f22;
+    }
+
+    .table-cell {
+      padding: 8px 12px;
+      border-right: 1px solid #1e1f22;
+      color: #dbdee1;
+    }
+
+    .horizontal-rule {
+      border: none;
+      border-top: 1px solid #4e5058;
+      margin: 16px 0;
+    }
+
+    .bold {
+      font-weight: 700;
+    }
+
+    .italic {
+      font-style: italic;
+    }
+
+    .strikethrough {
+      text-decoration: line-through;
+    }
+
+    .underline {
+      text-decoration: underline;
+    }
+
+    .spoiler {
+      background: #202225;
+      color: #202225;
+      border-radius: 3px;
+      padding: 0 2px;
+      cursor: pointer;
+      transition: all 0.1s ease;
+    }
+
+    .spoiler:hover {
+      background: #484b51;
+      color: #dcddde;
+    }
+
+    .markdown-link {
+      color: #00aff4;
+      text-decoration: none;
+    }
+
+    .markdown-link:hover {
+      text-decoration: underline;
+    }
+
+    .auto-link {
+      color: #00aff4;
+      text-decoration: none;
+    }
+
+    .auto-link:hover {
+      text-decoration: underline;
+    }
+
+    .stickers {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .sticker-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 160px;
+    }
+
+    .sticker {
+      width: 160px;
+      height: 160px;
+      object-fit: contain;
+      border-radius: 8px;
+      background: transparent;
+    }
+
+    .sticker-name {
+      font-size: 12px;
+      color: #b5bac1;
+      margin-top: 4px;
+      text-align: center;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+  <div class="discord-conversation">
+    ${conversationMarkup}
   </div>
 </body>
 </html>`;
 }
 
 /**
- * Renders a Discord message to an image buffer
- * @param msg - The Discord message to render
+ * Renders one or more Discord messages to either an image or HTML
+ * @param msg - The Discord message or array of messages to render
  * @param options - Optional rendering configuration
- * @returns Promise that resolves to image buffer or string
+ * @returns Promise that resolves to an image buffer or HTML string
  * @throws Error if message is invalid or rendering fails
  */
 export async function render(
-  msg: Message,
+  msg: Message | Message[],
   options: RenderOptions = {}
 ): Promise<string | Buffer<ArrayBufferLike> | (string | Buffer<ArrayBufferLike>)[]> {
   try {
@@ -1389,50 +2197,82 @@ export async function render(
       throw new Error("A message is required");
     }
 
-    const hasContent = msg.content && msg.content.trim().length > 0;
-    const hasEmbeds = msg.embeds.length > 0;
-    const hasAttachments = msg.attachments.size > 0;
-    const hasStickers = msg.stickers.size > 0;
-
-    if (!hasContent && !hasEmbeds && !hasAttachments && !hasStickers) {
-      throw new Error("Message must have content, embeds, attachments, or stickers to render");
+    const messages = Array.isArray(msg) ? msg : [msg];
+    if (messages.length === 0) {
+      throw new Error("At least one message is required");
     }
 
-    const { avatarURL, name, userColor, roleIcon } = extractUserInfo(msg);
-    const timestamp = formatDiscordTimestamp(msg.createdAt);
+    async function buildMessageMarkup(message: Message): Promise<string> {
+      const hasContent = message.content && message.content.trim().length > 0;
+      const hasEmbeds = message.embeds.length > 0;
+      const hasAttachments = message.attachments.size > 0;
+      const hasStickers = message.stickers.size > 0;
 
-    let replyMsg: ReplyMessageData | null = null;
-    if (msg.reference && msg.reference.messageId) {
-      try {
-        const referencedMessage = await msg.channel.messages.fetch(msg.reference.messageId);
-        const replyUserInfo = await extractReplyUserInfo(referencedMessage);
-        replyMsg = {
-          author: referencedMessage.author,
-          content: referencedMessage.content,
-          avatarURL: replyUserInfo.avatarURL,
-          name: replyUserInfo.name,
-          userColor: replyUserInfo.userColor,
-        };
-      } catch (error) {
-        console.warn("Could not fetch referenced message:", error);
+      if (!hasContent && !hasEmbeds && !hasAttachments && !hasStickers) {
+        throw new Error("Message must have content, embeds, attachments, or stickers to render");
       }
+
+      const { avatarURL, name, userColor, roleIcon } = extractUserInfo(message);
+      const timestamp = formatDiscordTimestamp(message.createdAt);
+
+      let replyMsg: ReplyMessageData | null = null;
+      if (message.reference && message.reference.messageId) {
+        try {
+          const referencedMessage = await message.channel.messages.fetch(message.reference.messageId);
+          const replyUserInfo = await extractReplyUserInfo(referencedMessage);
+          replyMsg = {
+            author: referencedMessage.author,
+            content: referencedMessage.content,
+            avatarURL: replyUserInfo.avatarURL,
+            name: replyUserInfo.name,
+            userColor: replyUserInfo.userColor,
+          };
+        } catch (error) {
+          console.warn("Could not fetch referenced message:", error);
+        }
+      }
+
+      const attachments = Array.from(message.attachments.values());
+      const stickers = Array.from(message.stickers.values());
+
+      return generateMessageMarkup(
+        avatarURL,
+        name,
+        userColor,
+        message.content,
+        timestamp,
+        roleIcon,
+        replyMsg,
+        attachments,
+        stickers,
+        message
+      );
     }
 
-    const attachments = Array.from(msg.attachments.values());
-    const stickers = Array.from(msg.stickers.values());
+    async function buildMessageDocument(message: Message): Promise<string> {
+      const markup = await buildMessageMarkup(message);
+      return generateMessageHTML(
+        "",
+        "",
+        "",
+        "",
+        "",
+        null,
+        null,
+        [],
+        [],
+        undefined
+      ).replace(/<body>[^]*?<\/body>/, `<body>${markup}</body>`);
+    }
 
-    const html = generateMessageHTML(
-      avatarURL,
-      name,
-      userColor,
-      msg.content,
-      timestamp,
-      roleIcon,
-      replyMsg,
-      attachments,
-      stickers,
-      msg
-    );
+    const messageMarkup = await Promise.all(messages.map((message) => buildMessageMarkup(message)));
+    const html = Array.isArray(msg)
+      ? generateConversationHTML(messageMarkup)
+      : await buildMessageDocument(messages[0]!);
+
+    if (options.format === "html") {
+      return html;
+    }
 
     const buffer = await nodeHtmlToImage({
       html,

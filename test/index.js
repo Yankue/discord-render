@@ -14,8 +14,8 @@ client.on("messageCreate", async msg => {
 	if(msg.content.startsWith("s")) {
 		await msg.react("🔥")
 
-		render(msg).then(buffer => {
-			fs.writeFile("./output.png", buffer, () => {})
+		render(msg, {format: "html"}).then(html => {
+			fs.writeFile("./output.html", html, () => {})
 		})
 	}
 })
