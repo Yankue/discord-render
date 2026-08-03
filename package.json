@@ -1,6 +1,6 @@
 {
   "name": "discord-render",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Render discord messages to an image!",
   "repository": "https://github.com/Yankue/discord-render",
   "type": "module",

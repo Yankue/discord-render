@@ -1022,9 +1022,10 @@ function generateMessageHTML(
     }
 
     .message-container.compact-message {
-      padding-top: 0;
+      padding-top: 2px;
       padding-bottom: 2px;
       min-height: auto;
+      margin-top: -8px;
     }
 
     .message-container.compact-message .avatar {
@@ -1032,7 +1033,7 @@ function generateMessageHTML(
     }
 
     .message-container.compact-message .content-wrapper {
-      margin-left: 0;
+      margin-left: 56px;
     }
 
     .message-container.compact-message .header {
@@ -1821,9 +1822,10 @@ function generateConversationHTML(markup: string[]): string {
     }
 
     .message-container.compact-message {
-      padding-top: 0;
+      padding-top: 2px;
       padding-bottom: 2px;
       min-height: auto;
+      margin-top: -8px;
     }
 
     .message-container.compact-message .avatar {
@@ -1831,7 +1833,7 @@ function generateConversationHTML(markup: string[]): string {
     }
 
     .message-container.compact-message .content-wrapper {
-      margin-left: 0;
+      margin-left: 56px;
     }
 
     .message-container.compact-message .header {

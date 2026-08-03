@@ -72,6 +72,8 @@ test('render groups consecutive messages from the same user into a compact follo
   assert.ok(compactBlock, 'expected a compact follow-up message block');
   assert.doesNotMatch(compactBlock[1], /class="avatar"/);
   assert.doesNotMatch(compactBlock[1], /<div class="header">/);
+  assert.match(html, /\.message-container\.compact-message\s*\{[\s\S]*?margin-top:\s*-8px;/);
+  assert.match(html, /\.message-container\.compact-message \.content-wrapper\s*\{[\s\S]*?margin-left:\s*56px;/);
 });
 
 test('render outputs rich embed markup for bot-style messages', async () => {

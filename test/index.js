@@ -22,12 +22,12 @@ client.on("messageCreate", async msg => {
 
 client.login(process.env.TOKEN)*/
 
-const msg = {
+const msgs = [{
 	content: "Hi guys",
 	embeds: [
 		{description: "Hello!\n# This is header", title: "Good morning!", color: "#15daff", footer: {text: "foot"}}
 	]
-}
+}]
 
 render(msg, {format: "image"}).then(buffer => {
 	fs.writeFile("./output.png", buffer, () => {})
