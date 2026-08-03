@@ -1,4 +1,5 @@
 import nodeHtmlToImage from 'node-html-to-image';
+import type { Buffer } from 'node:buffer';
 import type { Message as DiscordMessage, Attachment as DiscordAttachment, User as DiscordUser } from "discord.js";
 
 export interface RenderOptions {
@@ -83,6 +84,11 @@ export interface ReplyMessageData {
   name?: string;
   userColor?: string;
 }
+
+export type RenderResult<T extends RenderOptions['format'] | undefined = undefined> =
+  T extends 'html' ? string :
+  T extends 'image' ? Buffer :
+  string | Buffer;
 
 /**
  * Formats a Discord timestamp to match Discord's display format
@@ -2306,10 +2312,14 @@ function generateConversationHTML(markup: string[]): string {
  * @returns Promise that resolves to an image buffer or HTML string
  * @throws Error if message is invalid or rendering fails
  */
-export async function render(
+export function render<T extends RenderOptions['format'] | undefined = undefined>(
   msg: RenderableMessageInput | RenderableMessageInput[],
-  options: RenderOptions = {}
-): Promise<string | Buffer<ArrayBufferLike> | (string | Buffer<ArrayBufferLike>)[]> {
+  options?: RenderOptions & { format?: T }
+): Promise<RenderResult<T>>;
+export async function render<T extends RenderOptions['format'] | undefined = undefined>(
+  msg: RenderableMessageInput | RenderableMessageInput[],
+  options?: RenderOptions & { format?: T }
+): Promise<RenderResult<T>> {
   try {
     if (!msg) {
       throw new Error("A message is required");
@@ -2397,8 +2407,8 @@ export async function render(
       ? generateConversationHTML(messageMarkup)
       : await buildMessageDocument(messages[0]!);
 
-    if (options.format === "html") {
-      return html;
+    if (options?.format === "html") {
+      return html as RenderResult<T>;
     }
 
     const buffer = await nodeHtmlToImage({
@@ -2417,7 +2427,7 @@ export async function render(
       ...options,
     });
 
-    return buffer;
+    return buffer as RenderResult<T>;
   } catch (error) {
     console.error("Error rendering message:", error);
     throw new Error(
