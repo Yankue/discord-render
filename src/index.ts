@@ -980,6 +980,7 @@ function generateMessageHTML(
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
+  <title>Discord Render</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
@@ -1005,8 +1006,8 @@ function generateMessageHTML(
       display: flex;
       align-items: flex-start;
       position: relative;
-      padding: 12px 0;
-      min-height: 44px;
+      padding: 4px 0;
+      min-height: 28px;
     }
 
     .message-container.has-reply {
@@ -1022,10 +1023,10 @@ function generateMessageHTML(
     }
 
     .message-container.compact-message {
-      padding-top: 2px;
-      padding-bottom: 2px;
+      padding-top: 0px;
+      padding-bottom: 0px;
       min-height: auto;
-      margin-top: -8px;
+      margin-top: -20px;
     }
 
     .message-container.compact-message .avatar {
@@ -1770,6 +1771,7 @@ function generateConversationHTML(markup: string[]): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
+  <title>Discord Render</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
@@ -1805,8 +1807,8 @@ function generateConversationHTML(markup: string[]): string {
       display: flex;
       align-items: flex-start;
       position: relative;
-      padding: 12px 0;
-      min-height: 44px;
+      padding: 4px 0;
+      min-height: 28px;
     }
 
     .message-container.has-reply {
@@ -1822,10 +1824,10 @@ function generateConversationHTML(markup: string[]): string {
     }
 
     .message-container.compact-message {
-      padding-top: 2px;
-      padding-bottom: 2px;
+      padding-top: 0px;
+      padding-bottom: 0px;
       min-height: auto;
-      margin-top: -8px;
+      margin-top: -20px;
     }
 
     .message-container.compact-message .avatar {

@@ -24,11 +24,39 @@ client.login(process.env.TOKEN)*/
 
 const msgs = [{
 	content: "Hi guys",
+	author: {
+		username: "Mr Author",
+		avatarURL: "https://bing.com",
+		id: "authorman"
+	},
+	username: "Mr Author",
+	name: "Mr Author",
 	embeds: [
 		{description: "Hello!\n# This is header", title: "Good morning!", color: "#15daff", footer: {text: "foot"}}
-	]
+	],
+	createdAt: new Date()
+}, {
+	content: "whats good",
+	author: {
+		username: "Mr Author",
+		avatarURL: "https://bing.com",
+		id: "authorman"
+	},
+	username: "Mr Author",
+	name: "Mr Author",
+	createdAt: new Date()
+}, {
+	content: "AYYYYY",
+	author: {
+		username: "Mr Author",
+		avatarURL: "https://bing.com",
+		id: "authorman"
+	},
+	username: "Mr Author",
+	name: "Mr Author",
+	createdAt: new Date()
 }]
 
-render(msg, {format: "image"}).then(buffer => {
-	fs.writeFile("./output.png", buffer, () => {})
+render(msgs, {format: "html"}).then(buffer => {
+	fs.writeFile("./output.html", buffer, () => {})
 })
