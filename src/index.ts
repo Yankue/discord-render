@@ -6,6 +6,7 @@ export interface RenderOptions {
   width?: number;
   height?: number;
   format?: "image" | "html";
+  doLink?: boolean;
 }
 
 export interface RenderableUser {
@@ -53,6 +54,7 @@ export interface RenderableGuild {
 }
 
 export interface RenderableMessage {
+  id?: string | number;
   content?: string;
   createdAt?: Date | string | number;
   embeds?: unknown[];
@@ -724,6 +726,45 @@ function generateStickersHTML(stickers: RenderableSticker[]): string {
  * @param msg - The Discord message object for mention resolution
  * @returns Inner HTML string for the message
  */
+function getMessageIdentity(message: RenderableMessageInput): string {
+  const customMessage = message as RenderableMessage;
+  const author = customMessage.author as RenderableUser | undefined;
+  return (
+    (customMessage as RenderableMessage & { author?: RenderableUser & { id?: string | number } }).author?.id?.toString() ||
+    author?.username ||
+    author?.displayName ||
+    customMessage.username ||
+    customMessage.name ||
+    ""
+  );
+}
+
+function shouldCompactMessage(previous: RenderableMessageInput, current: RenderableMessageInput): boolean {
+  if (!previous || !current) return false;
+
+  const previousTime = previous.createdAt ? new Date(previous.createdAt).getTime() : NaN;
+  const currentTime = current.createdAt ? new Date(current.createdAt).getTime() : NaN;
+  const previousIdentity = getMessageIdentity(previous);
+  const currentIdentity = getMessageIdentity(current);
+
+  if (!Number.isFinite(previousTime) || !Number.isFinite(currentTime)) return false;
+  const diff = currentTime - previousTime;
+
+  return previousIdentity !== "" && currentIdentity !== "" && previousIdentity === currentIdentity && diff >= 0 && diff <= 7 * 60 * 1000;
+}
+
+function buildTimestampHTML(message: RenderableMessageInput, timestamp: string, doLink: boolean): string {
+  const hasTimestamp = Boolean(message.createdAt);
+  const messageId = (message as RenderableMessage).id;
+  const hasLinkableId = messageId !== undefined && messageId !== null && messageId !== "";
+
+  if (doLink && hasTimestamp && hasLinkableId) {
+    return `<a href="#message-${messageId}" class="timestamp-link"><span class="timestamp">${timestamp}</span></a>`;
+  }
+
+  return `<span class="timestamp">${timestamp}</span>`;
+}
+
 function generateMessageMarkup(
   avatarURL: string,
   name: string,
@@ -734,33 +775,41 @@ function generateMessageMarkup(
   replyMsg: ReplyMessageData | null,
   attachments: RenderableAttachment[],
   stickers: RenderableSticker[],
-  msg?: RenderableMessageInput
+  msg?: RenderableMessageInput,
+  compact: boolean = false,
+  doLink: boolean = false
 ): string {
   const parsedContent = parseMarkdown(content, false, msg);
   const escapedName = escapeHtml(name);
   const replyHTML = generateReplyHTML(replyMsg, msg);
   const attachmentsHTML = generateAttachmentsHTML(attachments);
   const stickersHTML = generateStickersHTML(stickers);
+  const timestampHTML = buildTimestampHTML(msg ?? {}, timestamp, doLink);
 
   const roleIconHTML = roleIcon
     ? `<img src="${roleIcon}" alt="Role icon" class="role-icon" />`
     : "";
 
   const hasReplyClass = replyMsg ? "has-reply" : "";
+  const compactClass = compact ? "compact-message" : "";
+  const messageId = (msg as RenderableMessage | undefined)?.id;
+  const avatarHTML = compact ? "" : `<img src="${avatarURL}" alt="${escapedName}'s avatar" class="avatar" />`;
 
   return `
-  <div class="discord-message">
-    <div class="message-container ${hasReplyClass}">
+  <div class="discord-message"${messageId !== undefined && messageId !== null && messageId !== "" ? ` id="message-${messageId}"` : ""}>
+    <div class="message-container ${hasReplyClass} ${compactClass}">
       ${replyMsg ? '<div class="reply-spine-container"><div class="reply-spine"></div></div>' : ""}
-      <img src="${avatarURL}" alt="${escapedName}'s avatar" class="avatar" />
+      ${avatarHTML}
       <div class="content-wrapper">
         ${replyHTML}
-        <div class="header">
+        ${compact ? "" : `<div class="header">
           <span class="username" style="color: ${userColor};">${escapedName}</span>
           ${roleIconHTML}
-          <span class="timestamp">${timestamp}</span>
-        </div>
-        <div class="content">${parsedContent}</div>
+          ${timestampHTML}
+        </div>`}
+        ${compact ? `<div class="compact-content">
+          ${parsedContent}
+        </div>` : `<div class="content">${parsedContent}</div>`}
         ${attachmentsHTML}
         ${stickersHTML}
       </div>
@@ -792,7 +841,9 @@ function generateMessageHTML(
   replyMsg: ReplyMessageData | null,
   attachments: RenderableAttachment[],
   stickers: RenderableSticker[],
-  msg?: RenderableMessageInput
+  msg?: RenderableMessageInput,
+  compact: boolean = false,
+  doLink: boolean = false
 ): string {
   const markup = generateMessageMarkup(
     avatarURL,
@@ -804,7 +855,9 @@ function generateMessageHTML(
     replyMsg,
     attachments,
     stickers,
-    msg
+    msg,
+    compact,
+    doLink
   );
 
   return `<!DOCTYPE html>
@@ -849,6 +902,34 @@ function generateMessageHTML(
 
     .message-container:not(.has-reply) .avatar {
       margin-top: 0px;
+    }
+
+    .message-container.compact-message {
+      padding-top: 2px;
+      padding-bottom: 2px;
+      min-height: 24px;
+    }
+
+    .message-container.compact-message .avatar {
+      display: none;
+    }
+
+    .message-container.compact-message .content-wrapper {
+      margin-left: 56px;
+    }
+
+    .message-container.compact-message .header {
+      display: none;
+    }
+
+    .message-container.compact-message .compact-content {
+      margin-top: 0;
+      font-size: 16px;
+      line-height: 1.375;
+      color: #dbdee1;
+      word-break: break-word;
+      white-space: pre-line;
+      margin-bottom: 2px;
     }
 
     .avatar {
@@ -901,6 +982,14 @@ function generateMessageHTML(
       font-weight: 400;
       margin-left: 6px;
       line-height: 1.375;
+    }
+
+    .timestamp-link {
+      text-decoration: none;
+    }
+
+    .timestamp-link:hover .timestamp {
+      text-decoration: underline;
     }
 
     .content {
@@ -1614,6 +1703,34 @@ function generateConversationHTML(markup: string[]): string {
       margin-top: 0px;
     }
 
+    .message-container.compact-message {
+      padding-top: 2px;
+      padding-bottom: 2px;
+      min-height: 24px;
+    }
+
+    .message-container.compact-message .avatar {
+      display: none;
+    }
+
+    .message-container.compact-message .content-wrapper {
+      margin-left: 56px;
+    }
+
+    .message-container.compact-message .header {
+      display: none;
+    }
+
+    .message-container.compact-message .compact-content {
+      margin-top: 0;
+      font-size: 16px;
+      line-height: 1.375;
+      color: #dbdee1;
+      word-break: break-word;
+      white-space: pre-line;
+      margin-bottom: 2px;
+    }
+
     .avatar {
       width: 40px;
       height: 40px;
@@ -1664,6 +1781,14 @@ function generateConversationHTML(markup: string[]): string {
       font-weight: 400;
       margin-left: 6px;
       line-height: 1.375;
+    }
+
+    .timestamp-link {
+      text-decoration: none;
+    }
+
+    .timestamp-link:hover .timestamp {
+      text-decoration: underline;
     }
 
     .content {
@@ -2330,7 +2455,7 @@ export async function render<T extends RenderOptions['format'] | undefined = und
       throw new Error("At least one message is required");
     }
 
-    async function buildMessageMarkup(message: RenderableMessageInput): Promise<string> {
+    async function buildMessageMarkup(message: RenderableMessageInput, compact: boolean = false): Promise<string> {
       const hasContent = typeof message.content === "string" && message.content.trim().length > 0;
       const hasEmbeds = Array.isArray(message.embeds) && message.embeds.length > 0;
       const hasAttachments = getCollectionSize(message.attachments) > 0;
@@ -2382,7 +2507,9 @@ export async function render<T extends RenderOptions['format'] | undefined = und
         replyMsg,
         attachments,
         stickers,
-        message
+        message,
+        compact,
+        options?.doLink === true
       );
     }
 
@@ -2398,11 +2525,18 @@ export async function render<T extends RenderOptions['format'] | undefined = und
         null,
         [],
         [],
-        undefined
+        undefined,
+        false,
+        options?.doLink === true
       ).replace(/<body>[^]*?<\/body>/, `<body>${markup}</body>`);
     }
 
-    const messageMarkup = await Promise.all(messages.map((message) => buildMessageMarkup(message)));
+    const messageMarkup = await Promise.all(
+      messages.map((message, index) => {
+        const compact = index > 0 && shouldCompactMessage(messages[index - 1]!, message);
+        return buildMessageMarkup(message, compact);
+      })
+    );
     const html = Array.isArray(msg)
       ? generateConversationHTML(messageMarkup)
       : await buildMessageDocument(messages[0]!);

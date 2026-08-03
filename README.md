@@ -53,6 +53,16 @@ const html = await render(message, { format: "html" });
 const html = await render(messages, { format: "html" });
 ```
 
+### Compact follow-up messages and timestamp links
+When rendering a conversation, consecutive messages from the same user within 7 minutes are rendered as compact follow-ups instead of repeating the avatar and username. You can also enable timestamp links for HTML output when the message has an id and a created timestamp:
+
+```js
+const html = await render(messages, {
+  format: "html",
+  doLink: true,
+});
+```
+
 ### Custom object shape
 You can supply a plain object with any of the following fields:
 
@@ -66,6 +76,7 @@ You can supply a plain object with any of the following fields:
 - `attachments`
 - `stickers`
 - `reference`
+- `id` (used for optional timestamp links when `doLink: true`)
 
 This makes the library useful for website previews, mockups, and other non-bot use cases.
 
